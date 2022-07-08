@@ -1,0 +1,33 @@
+---
+build app:
+  stage: build
+  image: nimlang/nim:1.6.6-regular
+  only:
+    - main
+  script:
+    - nimble build
+  artifacts:
+    paths:
+      - NimExporter
+    expire_in: 1 hour
+  tags:
+    - shared-linux
+
+build image:
+  stage: docker
+  image: ghcr.io/micro-fan/python:4.0.7
+  only:
+    - main
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE -f infra/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE
+  dependencies:
+    - build app
+  tags:
+    - shared-linux
+
+
+stages:
+  - build
+  - docker
