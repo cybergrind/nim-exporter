@@ -5,14 +5,12 @@ import os, system, times, json, logging
 import asynchttpserver, asyncdispatch, httpclient
 
 
-const port = 8080
+const port = 8082
 var
   server = newAsyncHttpServer()
   iteration = 0
-  stats = {"now": 0, "prev": 0, "prev_prev": 0}.toTable
+  stats {.threadvar.}: Table[string, int]
   PROMETHEUS {.threadvar.}: string
-
-
 
 
 proc cb(req: Request) {.async, gcsafe.} =
@@ -36,7 +34,7 @@ proc getValues(endTS: DateTime, name: string) {.async.} =
   let cli = newAsyncHttpClient()
   var uri = &"http://{PROMETHEUS}/api/v1/query"
   let query = encodeQuery({"time": $(endTS),
-                            "query": "max by(namespace) (monthly_all{namespace=\"app-prod\"})"})
+                            "query": "max by(namespace) (monthly_all{namespace=\"octo-prod\"})"})
   uri = &"{uri}?{query}"
   debug(&"Get on: {uri}")
   let resp = await cli.get(uri)
@@ -45,6 +43,7 @@ proc getValues(endTS: DateTime, name: string) {.async.} =
   debug(&"{body}")
   let jsonData = parseJson(body)
   stats[name] = jsonData["data"]["result"][0]["value"][1].getStr.parseInt
+  cli.close()
 
 
 
@@ -63,16 +62,14 @@ proc updateLoop() {.async.} =
       let msg = getCurrentExceptionMsg()
       error(&"Exception: {msg}")
       discard
-    await sleepAsync(30000)
-
-
-
+    await sleepAsync(3000)
 
 
 when isMainModule:
   let consoleLogger = newConsoleLogger()
   addHandler(consoleLogger)
   setLogFilter(lvlInfo)
+  stats = {"now": 0, "prev": 0, "prev_prev": 0}.toTable
 
   PROMETHEUS = getEnv("PROMETHEUS", "")
   if PROMETHEUS.len() == 0:
