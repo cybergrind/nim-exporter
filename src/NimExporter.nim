@@ -32,6 +32,7 @@ proc cb(req: Request) {.async, gcsafe.} =
 
 proc getValues(endTS: DateTime, name: string) {.async.} =
   let cli = newAsyncHttpClient()
+  defer: cli.close()
   var uri = &"http://{PROMETHEUS}/api/v1/query"
   let query = encodeQuery({"time": $(endTS),
                             "query": "max by(namespace) (monthly_all{namespace=\"octo-prod\"})"})
@@ -43,8 +44,6 @@ proc getValues(endTS: DateTime, name: string) {.async.} =
   debug(&"{body}")
   let jsonData = parseJson(body)
   stats[name] = jsonData["data"]["result"][0]["value"][1].getStr.parseInt
-  cli.close()
-
 
 
 proc updateLoop() {.async.} =
